@@ -34,8 +34,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-client = OpenAI(api_key=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)
+# API 키: 매번 입력 (사이드바)
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
+
+with st.sidebar:
+    st.session_state.api_key = st.text_input(
+        "🔑 OpenAI API 키", value=st.session_state.api_key,
+        type="password", placeholder="sk-...")
+
+if not st.session_state.api_key:
+    st.info("🔑 왼쪽에 OpenAI API 키를 넣으면 몰랑이가 깨어나요 🐰")
+    st.stop()
+
+client = OpenAI(api_key=st.session_state.api_key)
 
 def dataurl(b64): return f"data:image/png;base64,{b64}"
 
