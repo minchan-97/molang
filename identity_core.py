@@ -53,8 +53,21 @@ class IdentityMemory:
             rs = "\n".join(f"- {r}" for r in self.judgment_rules)
             parts.append(f"[너의 판단 기준 — 이 기준으로 판단하라]\n{rs}")
         if self.learned_facts:
-            fs = "\n".join(f"- {f}" for f in self.learned_facts[-30:])
-            parts.append(f"[네가 축적한 지식]\n{fs}")
+            # 신뢰도 높은 것 우선. 확정/추정 구분해서 주입.
+            items = []
+            for f in self.learned_facts:
+                if isinstance(f, dict):
+                    s = f.get("strength", 0.6)
+                    if s <= 0.2:
+                        continue
+                    tag = "" if s >= 0.8 else " (아마도)"
+                    items.append((s, f"- {f['text']}{tag}"))
+                else:
+                    items.append((0.6, f"- {f}"))
+            items.sort(key=lambda x: -x[0])
+            if items:
+                fs = "\n".join(t for _, t in items[:30])
+                parts.append(f"[네가 축적한 지식]\n{fs}")
         if self.episodic:
             es = "\n".join(f"- {e}" for e in self.episodic[-10:])
             parts.append(f"[최근 대화에서 형성된 맥락]\n{es}")
@@ -68,33 +81,81 @@ class IdentityMemory:
                consolidate_fn=None):
         """대화에서 배운 것을 정체성에 흡수.
         - episodic(단기): 항상 저장
-        - learned_facts(장기): learned가 있거나, consolidate_fn이 사실을 추출하면 승격
+        - learned_facts(장기): 압축된 사실을 신뢰도와 함께 저장/강화/약화
         """
         summary = f"Q: {question[:60]} / A: {answer[:80]}"
         self.episodic.append(summary)
 
-        # 명시적 learned가 있으면 바로 장기로
         if learned:
-            self._add_fact(learned)
+            self._reinforce_or_add(learned)
 
-        # 응고화: LLM이 이 대화에서 '기억할 사실'을 추출하면 장기로 승격
+        # 응고화: LLM이 압축된 사실 + 충돌 여부를 판단
         if consolidate_fn is not None:
             try:
-                fact = consolidate_fn(question, answer, self.learned_facts)
-                if fact and fact.strip() and fact.strip().upper() != "NONE":
-                    self._add_fact(fact.strip())
+                result = consolidate_fn(question, answer, self._fact_texts())
+                # result: {"fact": str, "conflicts_with": str|None} 또는 None/문자열(하위호환)
+                if isinstance(result, dict):
+                    fact = (result.get("fact") or "").strip()
+                    conflict = result.get("conflicts_with")
+                    if fact and fact.upper() != "NONE":
+                        if conflict:
+                            self._weaken(conflict)   # 충돌 사실 천천히 약화
+                        self._reinforce_or_add(fact)
+                elif result and str(result).strip().upper() != "NONE":
+                    self._reinforce_or_add(str(result).strip())
             except Exception:
                 pass
 
-    def _add_fact(self, fact: str):
-        """장기 확정 기억에 추가 (중복 방지)."""
-        # 유사 중복 방지: 앞 40자가 겹치면 스킵
-        head = fact[:40]
-        for existing in self.learned_facts:
-            if existing[:40] == head:
+    # ---- 장기기억: 신뢰도 기반 점진적 관리 ----
+    def _fact_texts(self):
+        """현재 살아있는(신뢰도>0) 사실들의 텍스트 목록."""
+        out = []
+        for f in self.learned_facts:
+            if isinstance(f, dict):
+                if f.get("strength", 1.0) > 0.2:
+                    out.append(f["text"])
+            else:
+                out.append(f)   # 구버전 문자열
+        return out
+
+    def _reinforce_or_add(self, fact: str, step: float = 0.25):
+        """이미 아는 사실이면 신뢰도 강화, 새 사실이면 추가."""
+        head = fact[:30]
+        for f in self.learned_facts:
+            text = f["text"] if isinstance(f, dict) else f
+            if text[:30] == head:
+                if isinstance(f, dict):
+                    f["strength"] = min(1.0, f.get("strength", 0.6) + step)
+                    f["seen"] = f.get("seen", 1) + 1
                 return
-        self.learned_facts.append(fact)
+        # 새 사실 (초기 신뢰도 0.6 — 한 번 들은 건 아직 확정 아님)
+        self.learned_facts.append({"text": fact, "strength": 0.6, "seen": 1})
         self.revisions.append({"at": time.time(), "added": fact[:60]})
+
+    def _weaken(self, fact_text: str, step: float = 0.3):
+        """충돌하는 기존 사실을 천천히 약화. 임계 밑이면 폐기."""
+        head = fact_text[:30]
+        survivors = []
+        for f in self.learned_facts:
+            text = f["text"] if isinstance(f, dict) else f
+            if text[:30] == head:
+                if isinstance(f, dict):
+                    f["strength"] = f.get("strength", 0.6) - step
+                    self.revisions.append({"at": time.time(), "weakened": text[:60],
+                                           "to": round(f["strength"], 2)})
+                    if f["strength"] > 0.2:      # 아직 살아있음
+                        survivors.append(f)
+                    # 0.2 이하면 폐기 (천천히 여러 번 충돌해야 사라짐)
+                else:
+                    # 구버전 문자열은 dict로 승격시키며 약화
+                    survivors.append({"text": text, "strength": 0.6 - step, "seen": 1})
+            else:
+                survivors.append(f)
+        self.learned_facts = survivors
+
+    def _add_fact(self, fact: str):
+        """(하위호환) 단순 추가 → 이제 신뢰도 기반으로."""
+        self._reinforce_or_add(fact)
 
     def add_value(self, value: str):
         self.values.append(value)
