@@ -319,3 +319,4 @@ def make_consolidator(client, model: str = "gpt-4o-mini"):
         except Exception:
             return None
     return consolidate_fn
+
