@@ -149,4 +149,3 @@ def read_photo_emotion(client, photo_b64, mime):
         return emo if emo in EMOTIONS else "보통"
     except Exception:
         return "보통"
-
