@@ -26,6 +26,7 @@ def save_molang_bytes(unified) -> bytes:
         "arcogit": arcogit_blob,
         "molang_faces": getattr(unified, "molang_faces", {}),
         "molang_appearance": getattr(unified, "molang_appearance", None),
+        "last_talk_ts": getattr(unified, "last_talk_ts", None),
     }
     return pickle.dumps(bundle)
 
@@ -53,4 +54,5 @@ def load_molang_bytes(raw: bytes) -> UnifiedIdentity:
     skin.install_molang_persona(u)
     u.molang_faces = bundle.get("molang_faces", {})
     u.molang_appearance = bundle.get("molang_appearance", None)
+    u.last_talk_ts = bundle.get("last_talk_ts", None)
     return u
