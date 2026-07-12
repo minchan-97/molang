@@ -74,15 +74,20 @@ def extract_appearance(client, base_image_b64, mime="image/png"):
             messages=[{
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": (
-                        "이 캐릭터의 외형을 DALL-E 생성 프롬프트로 쓸 수 있게 "
-                        "구체적으로 묘사해줘. 색·형태·비율·질감·스타일을 "
-                        "표정 빼고 한 문단으로.")},
                     {"type": "image_url",
-                     "image_url": {"url": f"data:{mime};base64,{base_image_b64}"}}
+                     "image_url": {"url": f"data:{mime};base64,{base_image_b64}"}},
+                    {"type": "text", "text": (
+                        "이 캐릭터의 시각적 특성을 이미지 생성 프롬프트에 재사용할 수 있게 "
+                        "아주 구체적으로 설명해줘. 다음을 각각 명확하게:\n"
+                        "- 동물 종류/정체 (예: 흰 토끼)\n"
+                        "- 몸 형태와 비율 (둥근지, 통통한지)\n"
+                        "- 색상 (몸/귀/볼 등 부위별)\n"
+                        "- 눈·코·입 생김새\n"
+                        "- 그림 스타일 (2D 일러스트, 파스텔 등)\n"
+                        "표정은 빼고 외형만. 이 특징이 모든 그림에서 똑같이 유지되어야 해.")}
                 ]
             }],
-            temperature=0.3, max_tokens=250)
+            temperature=0.2, max_tokens=500)
         return resp.choices[0].message.content.strip()
     except Exception as e:
         print(f"외형 추출 실패: {e}")
@@ -96,9 +101,13 @@ def generate_face(client, appearance, emotion):
     base = appearance or "둥근 흰 토끼 캐릭터, 파스텔톤, 심플한 2D 일러스트"
     try:
         prompt = (
-            f"{base}\n이 캐릭터가 {EMOTION_PROMPTS.get(emotion, '부드럽게 미소짓는')}를 "
-            f"짓고 있는 그림. 위 외형을 정확히 유지하고 표정만 바꿀 것. "
-            f"흰 배경, 정면, 얼굴 잘 보이게.")
+            f"[캐릭터 외형 — 반드시 정확히 이대로 그릴 것]\n{base}\n\n"
+            f"[표정] 위 캐릭터가 {EMOTION_PROMPTS.get(emotion, '부드럽게 미소짓는')}를 "
+            f"짓고 있는 모습.\n\n"
+            f"[규칙] 위에 설명된 외형(동물 종류·색·형태·스타일)을 "
+            f"하나도 바꾸지 말고 똑같이 유지할 것. 표정만 바꿀 것. "
+            f"같은 캐릭터임이 분명해야 함. 흰 배경, 정면, 얼굴 잘 보이게, "
+            f"단일 캐릭터만.")
         # image_gascore가 실제로 쓴 모델: gpt-image-1
         resp = client.images.generate(
             model="gpt-image-1", prompt=prompt, size="1024x1024", n=1)
