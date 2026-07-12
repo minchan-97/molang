@@ -90,7 +90,8 @@ def extract_appearance(client, base_image_b64, mime="image/png"):
 
 
 def generate_face(client, appearance, emotion):
-    """고정 외형 + 감정 → 일관된 몰랑이 표정. 최초 1회만 (이후 캐시)."""
+    """고정 외형 + 감정 → 일관된 몰랑이 표정. 최초 1회만 (이후 캐시).
+    반환: (b64, None) 성공 / (None, 에러메시지) 실패"""
     base = appearance or "둥근 흰 토끼 캐릭터 '몰랑이', 파스텔톤, 심플한 2D 일러스트"
     try:
         prompt = (
@@ -100,10 +101,9 @@ def generate_face(client, appearance, emotion):
         resp = client.images.generate(
             model="dall-e-3", prompt=prompt, size="1024x1024",
             quality="standard", n=1, response_format="b64_json")
-        return resp.data[0].b64_json
+        return resp.data[0].b64_json, None
     except Exception as e:
-        print(f"표정 생성 실패({emotion}): {e}")
-        return None
+        return None, str(e)
 
 
 def detect_emotion(client, molang_reply):
