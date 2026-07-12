@@ -76,14 +76,14 @@ with st.sidebar:
     st.markdown("### 🐰 몰랑이 준비")
 
     # pkl 업로드 (이어가기)
-    up = st.file_uploader("💾 저장된 몰랑이 불러오기 (.pkl)", type=["pkl"])
+    up = st.file_uploader("💾 저장된 몰랑이 불러오기", type=None)
     if up and st.button("불러오기"):
         try:
             st.session_state.unified = persist.load_molang_bytes(up.getvalue())
             st.session_state.chat = [("molang","다시 만나서 반가워! 🐰💗","기쁨")]
             st.success("몰랑이가 돌아왔어요!"); st.rerun()
         except Exception as e:
-            st.error(f"불러오기 실패: {e}")
+            st.error(f"불러오기 실패: {e} (몰랑이 pkl 파일이 맞는지 확인해줘)")
 
     st.markdown("---")
     st.caption("처음이면: 몰랑이 사진 → 외형학습 → 표정생성")
@@ -97,15 +97,33 @@ with st.sidebar:
 
     if skin.has_appearance(u) and st.button("② 표정 5종 생성"):
         prog = st.progress(0.0)
+        fails = []
         for i,emo in enumerate(skin.EMOTIONS):
             if not skin.has_face(u, emo):
                 fb = skin.generate_face(client, skin.get_appearance(u), emo)
-                if fb: skin.store_face(u, emo, fb)
+                if fb:
+                    skin.store_face(u, emo, fb)
+                else:
+                    fails.append(emo)
             prog.progress((i+1)/len(skin.EMOTIONS))
-        st.success("표정 완성! 💗")
+        if fails:
+            st.error(f"표정 생성 실패: {', '.join(fails)} (API 키/한도 확인)")
+        else:
+            st.success("표정 완성! 💗")
+        st.rerun()
 
     made = [e for e in skin.EMOTIONS if skin.has_face(u, e)]
-    if made: st.caption(f"표정: {', '.join(made)}")
+    if made:
+        st.caption(f"만든 표정: {', '.join(made)}")
+        # 미리보기 (생성 확인)
+        import base64 as _b64
+        cols = st.columns(len(made))
+        for c, emo in zip(cols, made):
+            try:
+                c.image(_b64.b64decode(skin.get_face(u, emo)),
+                        caption=emo, width=60)
+            except Exception:
+                c.caption(f"{emo}?")
 
     st.markdown("---")
     # pkl 다운로드 (보관) — Arcogit + 표정 통째로
@@ -132,9 +150,14 @@ for role,text,emo in st.session_state.chat:
                     f'<div class="bubble-you">{text}</div></div>', unsafe_allow_html=True)
 
 # ── 입력 ──
-photo = st.file_uploader("📷 사진 보여주기", type=["png","jpg","jpeg","webp","gif","bmp"], key="ph")
+if "photo_key" not in st.session_state:
+    st.session_state.photo_key = 0
+photo = st.file_uploader("📷 사진 보여주기",
+    type=["png","jpg","jpeg","webp","gif","bmp"],
+    key=f"ph_{st.session_state.photo_key}")
 msg = st.chat_input("몰랑이한테 말 걸기...")
 
+# 이미 처리한 입력인지 체크 (사진 무한 반응 방지)
 if msg or photo:
     show = msg or "(사진을 보냈어요 📷)"
     st.session_state.chat.append(("me", show, "보통"))
@@ -175,4 +198,6 @@ if msg or photo:
         u.identity.absorb(show, answer)
 
     st.session_state.chat.append(("molang", answer, emotion))
+    if photo:
+        st.session_state.photo_key += 1   # 업로더 리셋 → 같은 사진 재반응 방지
     st.rerun()
