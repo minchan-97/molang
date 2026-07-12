@@ -10,9 +10,11 @@ from openai import OpenAI
 
 from unified_identity import UnifiedIdentity
 from llm_bridge import (make_choose_fn, make_answer_fn, detect_feedback,
-                        make_tree_designer, make_classifier)
+                        make_tree_designer, make_classifier, make_consolidator)
 from tree_registry import load_logic_db_types
 import molang_skin as skin
+import molang_time as mtime
+import time as _time
 import molang_persist as persist
 
 st.set_page_config(page_title="몰랑이 💗", page_icon="🐰", layout="centered")
@@ -66,6 +68,7 @@ choose_fn = make_choose_fn(client)
 answer_fn = make_answer_fn(client, {})
 designer = make_tree_designer(client)
 classify_fn = make_classifier(client)
+consolidate_fn = make_consolidator(client)
 
 def profile_for(emotion):
     if skin.has_face(u, emotion): return skin.get_face(u, emotion)
@@ -141,7 +144,7 @@ last_emo = st.session_state.chat[-1][2] if st.session_state.chat else "기쁨"
 hp = profile_for(last_emo)
 head = f'<img src="{dataurl(hp)}" class="head-pic">' if hp else '🐰'
 st.markdown(f'<div class="chat-head">{head}몰랑이 💗</div>', unsafe_allow_html=True)
-st.caption("🔧 버전 v6 (사고성장)")  # 이게 보이면 새 코드가 도는 것
+st.caption("🔧 버전 v10 (시간동기화)")  # 이게 보이면 새 코드가 도는 것
 
 # ── 대화 표시 ──
 for role,text,emo in st.session_state.chat:
@@ -168,6 +171,9 @@ if msg or photo:
     st.session_state.chat.append(("me", show, "보통"))
 
     with st.spinner("몰랑이가 생각 중... 🐰"):
+        # 시간 맥락 (한국시간 KST 기준)
+        last_ts = getattr(u, "last_talk_ts", None)
+        time_ctx = mtime.time_context(last_ts)
         # ── 내부: Arcogit이 생각 (유형판별→트리→기억주입→답) ──
         q = msg or "이 사진 보고 몰랑이답게 반응해줘"
         # 사진이면 answer_fn 대신 직접 vision 호출로 답 생성
@@ -175,7 +181,7 @@ if msg or photo:
             pb = base64.b64encode(photo.getvalue()).decode()
             try:
                 r = client.chat.completions.create(model="gpt-4o",
-                    messages=[{"role":"system","content":u.identity.to_system_prompt()},
+                    messages=[{"role":"system","content":u.identity.to_system_prompt()+"\n"+time_ctx},
                         {"role":"user","content":[
                             {"type":"text","text":"이 사진 보고 몰랑이답게 반응해줘!"},
                             {"type":"image_url","image_url":{"url":f"data:{photo.type};base64,{pb}"}}]}],
@@ -184,7 +190,8 @@ if msg or photo:
             except Exception: answer = "우와 사진이다! 🐰💗"
             result = None
         else:
-            result = u.think(q, choose_fn=choose_fn, answer_fn=answer_fn,
+            q_with_time = (q + "\n" + time_ctx) if time_ctx else q
+            result = u.think(q_with_time, choose_fn=choose_fn, answer_fn=answer_fn,
                              classify_fn=classify_fn, tree_factory=designer)
             answer = result["answer"] or "히힛 🐰"
 
@@ -200,7 +207,8 @@ if msg or photo:
             u.react(result, fb_val if fb_val is not None else 0.5,
                     was_corrected=(fb_val is not None and fb_val>0))
         # 대화 맥락은 정체성 기억에 흡수
-        u.identity.absorb(show, answer)
+        u.identity.absorb(show, answer, consolidate_fn=consolidate_fn)
+        u.last_talk_ts = _time.time()   # 시간 동기화용
 
     st.session_state.chat.append(("molang", answer, emotion))
     if photo:
