@@ -248,3 +248,34 @@ def make_tree_designer(client, model: str = "gpt-4o-mini"):
             pass
         return None
     return design_fn
+
+
+def make_classifier(client, model: str = "gpt-4o-mini"):
+    """
+    질문을 사고 유형 중 하나로 분류. 없으면 None(→ 새 유형 생성 유도).
+    """
+    def classify_fn(question, type_ids, type_examples):
+        try:
+            # 유형 목록 + 예시를 간단히
+            lines = []
+            for tid in type_ids[:20]:
+                exs = type_examples.get(tid, [])
+                ex = exs[0][:30] if exs else ""
+                lines.append(f"- {tid}: {ex}")
+            catalog = "\n".join(lines)
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": (
+                    f"다음 말이 어떤 사고 유형인지 골라줘.\n\n"
+                    f"유형 목록:\n{catalog}\n\n"
+                    f"말: {question}\n\n"
+                    f"딱 유형 id 하나만 답해. 목록에 맞는 게 없으면 'NEW'라고 답해.")}],
+                temperature=0, max_tokens=15)
+            ans = resp.choices[0].message.content.strip()
+            if ans in type_ids:
+                return ans
+            return None  # NEW거나 매칭 실패 → 새 유형 생성 유도
+        except Exception:
+            return None
+    return classify_fn
+
