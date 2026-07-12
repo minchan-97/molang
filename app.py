@@ -10,7 +10,7 @@ from openai import OpenAI
 
 from unified_identity import UnifiedIdentity
 from llm_bridge import (make_choose_fn, make_answer_fn, detect_feedback,
-                        make_tree_designer)
+                        make_tree_designer, make_classifier)
 from tree_registry import load_logic_db_types
 import molang_skin as skin
 import molang_persist as persist
@@ -65,6 +65,7 @@ u = st.session_state.unified
 choose_fn = make_choose_fn(client)
 answer_fn = make_answer_fn(client, {})
 designer = make_tree_designer(client)
+classify_fn = make_classifier(client)
 
 def profile_for(emotion):
     if skin.has_face(u, emotion): return skin.get_face(u, emotion)
@@ -140,7 +141,7 @@ last_emo = st.session_state.chat[-1][2] if st.session_state.chat else "기쁨"
 hp = profile_for(last_emo)
 head = f'<img src="{dataurl(hp)}" class="head-pic">' if hp else '🐰'
 st.markdown(f'<div class="chat-head">{head}몰랑이 💗</div>', unsafe_allow_html=True)
-st.caption("🔧 버전 v3 (표정수정판)")  # 이게 보이면 새 코드가 도는 것
+st.caption("🔧 버전 v6 (사고성장)")  # 이게 보이면 새 코드가 도는 것
 
 # ── 대화 표시 ──
 for role,text,emo in st.session_state.chat:
@@ -184,7 +185,7 @@ if msg or photo:
             result = None
         else:
             result = u.think(q, choose_fn=choose_fn, answer_fn=answer_fn,
-                             tree_factory=None)
+                             classify_fn=classify_fn, tree_factory=designer)
             answer = result["answer"] or "히힛 🐰"
 
         emotion = skin.detect_emotion(client, answer)
