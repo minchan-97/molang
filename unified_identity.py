@@ -53,8 +53,19 @@ class UnifiedIdentity:
         type_id = self.registry.classify_type(
             question, embed_fn=embed_fn, classify_fn=classify_fn)
         if type_id is None:
-            type_id = "general"
-        tree = self.registry.get_or_create(type_id, factory=tree_factory)
+            # 분류 실패 → LLM이 새 사고 유형을 설계 (유형 자동생성)
+            if tree_factory is not None:
+                try:
+                    design = tree_factory(question)
+                    new_id = self.registry.create_from_design(
+                        design, question, reason="새 사고 유형 감지")
+                    if new_id:
+                        type_id = new_id
+                except Exception:
+                    pass
+            if type_id is None:
+                type_id = "general"
+        tree = self.registry.get_or_create(type_id)
 
         # 2. 정체성 기억 + 트리 관련 기억을 맥락에 주입
         identity_prompt = self.identity.to_system_prompt()
