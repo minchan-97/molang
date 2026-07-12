@@ -64,13 +64,37 @@ class IdentityMemory:
         return identity_block
 
     # --- 자기진화: 답변 후 정체성에 누적 ---
-    def absorb(self, question: str, answer: str, learned: str = ""):
-        """대화에서 배운 것을 정체성에 흡수(강제 기억 주입)."""
+    def absorb(self, question: str, answer: str, learned: str = "",
+               consolidate_fn=None):
+        """대화에서 배운 것을 정체성에 흡수.
+        - episodic(단기): 항상 저장
+        - learned_facts(장기): learned가 있거나, consolidate_fn이 사실을 추출하면 승격
+        """
         summary = f"Q: {question[:60]} / A: {answer[:80]}"
         self.episodic.append(summary)
+
+        # 명시적 learned가 있으면 바로 장기로
         if learned:
-            self.learned_facts.append(learned)
-            self.revisions.append({"at": time.time(), "added": learned[:60]})
+            self._add_fact(learned)
+
+        # 응고화: LLM이 이 대화에서 '기억할 사실'을 추출하면 장기로 승격
+        if consolidate_fn is not None:
+            try:
+                fact = consolidate_fn(question, answer, self.learned_facts)
+                if fact and fact.strip() and fact.strip().upper() != "NONE":
+                    self._add_fact(fact.strip())
+            except Exception:
+                pass
+
+    def _add_fact(self, fact: str):
+        """장기 확정 기억에 추가 (중복 방지)."""
+        # 유사 중복 방지: 앞 40자가 겹치면 스킵
+        head = fact[:40]
+        for existing in self.learned_facts:
+            if existing[:40] == head:
+                return
+        self.learned_facts.append(fact)
+        self.revisions.append({"at": time.time(), "added": fact[:60]})
 
     def add_value(self, value: str):
         self.values.append(value)
