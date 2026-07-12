@@ -56,11 +56,12 @@ class TreeRegistry:
             return None
         type_ids = list(self.trees.keys())
 
-        # LLM 판별 (제일 정확)
+        # LLM 판별 (제일 정확). None을 주면 '새 유형' 신호로 존중.
         if classify_fn is not None:
             chosen = classify_fn(question, type_ids, self.type_examples)
             if chosen in self.trees:
                 return chosen
+            return None   # classify_fn이 매칭 실패/NEW → 새 유형 생성 유도
 
         # 임베딩 유사도
         if embed_fn is not None:
