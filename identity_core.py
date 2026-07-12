@@ -198,3 +198,4 @@ def continuity_rate(snap_a: dict, snap_b: dict) -> float:
         weight += 2
         score += 2 * (len(ra & rb) / max(len(ra | rb), 1))
     return round(score / weight, 3) if weight else 1.0
+
