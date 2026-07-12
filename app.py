@@ -98,19 +98,22 @@ with st.sidebar:
     if skin.has_appearance(u) and st.button("② 표정 5종 생성"):
         prog = st.progress(0.0)
         fails = []
+        last_err = None
         for i,emo in enumerate(skin.EMOTIONS):
             if not skin.has_face(u, emo):
-                fb = skin.generate_face(client, skin.get_appearance(u), emo)
+                fb, err = skin.generate_face(client, skin.get_appearance(u), emo)
                 if fb:
                     skin.store_face(u, emo, fb)
                 else:
-                    fails.append(emo)
+                    fails.append(emo); last_err = err
             prog.progress((i+1)/len(skin.EMOTIONS))
         if fails:
-            st.error(f"표정 생성 실패: {', '.join(fails)} (API 키/한도 확인)")
+            st.error(f"표정 생성 실패: {', '.join(fails)}")
+            if last_err:
+                st.warning(f"이유: {last_err}")
         else:
             st.success("표정 완성! 💗")
-        st.rerun()
+            st.rerun()
 
     made = [e for e in skin.EMOTIONS if skin.has_face(u, e)]
     if made:
@@ -137,6 +140,7 @@ last_emo = st.session_state.chat[-1][2] if st.session_state.chat else "기쁨"
 hp = profile_for(last_emo)
 head = f'<img src="{dataurl(hp)}" class="head-pic">' if hp else '🐰'
 st.markdown(f'<div class="chat-head">{head}몰랑이 💗</div>', unsafe_allow_html=True)
+st.caption("🔧 버전 v3 (표정수정판)")  # 이게 보이면 새 코드가 도는 것
 
 # ── 대화 표시 ──
 for role,text,emo in st.session_state.chat:
@@ -186,7 +190,7 @@ if msg or photo:
         emotion = skin.detect_emotion(client, answer)
         # 표정 없으면 생성+캐시 (identity에 저장 → pkl에 같이 감)
         if not skin.has_face(u, emotion) and skin.has_appearance(u):
-            fb = skin.generate_face(client, skin.get_appearance(u), emotion)
+            fb, _err = skin.generate_face(client, skin.get_appearance(u), emotion)
             if fb: skin.store_face(u, emotion, fb)
 
         # ── 내부: Arcogit 진화 (피드백 학습 + 기억 흡수) ──
@@ -201,4 +205,3 @@ if msg or photo:
     if photo:
         st.session_state.photo_key += 1   # 업로더 리셋 → 같은 사진 재반응 방지
     st.rerun()
-
