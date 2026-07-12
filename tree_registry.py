@@ -113,6 +113,18 @@ class TreeRegistry:
         if type_id in self.trees:
             return type_id   # 이미 있으면 그대로
 
+        # 과생성 방지 1: 자동생성 트리 총량 상한
+        auto_created = len(self.creation_log)
+        if auto_created >= 12:
+            return None   # 이미 충분히 다양 → 기존 유형으로 처리
+
+        # 과생성 방지 2: 화제성 이름 거부 (사고방식이 아닌 주제면 안 만듦)
+        topic_like = {"preference", "time_management", "conversation", "hobby",
+                      "food", "sports", "weather", "greeting", "daily", "chat",
+                      "fashion_advice", "small_talk", "emotion_talk"}
+        if type_id.lower() in topic_like:
+            return None
+
         steps = design["steps"]
         if not steps:
             return None
