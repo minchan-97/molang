@@ -252,30 +252,70 @@ def make_tree_designer(client, model: str = "gpt-4o-mini"):
 
 def make_classifier(client, model: str = "gpt-4o-mini"):
     """
-    질문을 사고 유형 중 하나로 분류. 없으면 None(→ 새 유형 생성 유도).
+    질문을 사고 유형 중 하나로 분류. 정말 새로운 '추론 방식'일 때만 None(→새 유형).
+    화제(취향/시간/일상)가 다르다고 새 유형을 만들지 않는다.
     """
     def classify_fn(question, type_ids, type_examples):
         try:
-            # 유형 목록 + 예시를 간단히
             lines = []
-            for tid in type_ids[:20]:
+            for tid in type_ids[:40]:   # 더 많이 보여줘 매칭률 높임
                 exs = type_examples.get(tid, [])
-                ex = exs[0][:30] if exs else ""
+                ex = exs[0][:28] if exs else ""
                 lines.append(f"- {tid}: {ex}")
             catalog = "\n".join(lines)
             resp = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": (
-                    f"다음 말이 어떤 사고 유형인지 골라줘.\n\n"
-                    f"유형 목록:\n{catalog}\n\n"
-                    f"말: {question}\n\n"
-                    f"딱 유형 id 하나만 답해. 목록에 맞는 게 없으면 'NEW'라고 답해.")}],
+                    "아래 '말'이 어떤 '추론/사고 방식'인지 목록에서 하나 골라줘.\n\n"
+                    "중요 규칙:\n"
+                    "- 유형은 '화제(축구/취향/시간)'가 아니라 '사고 방식'이다. "
+                    "(예: 비교하기, 원인 추론, 조건 판단, 분류, 예시 들기, 감정 공감 등)\n"
+                    "- 일상 대화·잡담·인사·감정 표현은 대부분 기존의 일반적 유형에 속한다. "
+                    "웬만하면 목록에서 가장 가까운 것을 고를 것.\n"
+                    "- '완전히 새로운 추론 구조'여서 목록 어디에도 안 맞을 때만 'NEW'. "
+                    "화제가 새롭다는 이유로 NEW를 쓰지 마라.\n\n"
+                    f"[유형 목록]\n{catalog}\n\n"
+                    f"[말] {question}\n\n"
+                    "유형 id 하나만 (정말 새로운 사고방식이면 NEW):")}],
                 temperature=0, max_tokens=15)
             ans = resp.choices[0].message.content.strip()
             if ans in type_ids:
                 return ans
-            return None  # NEW거나 매칭 실패 → 새 유형 생성 유도
+            return None
         except Exception:
             return None
     return classify_fn
 
+
+def make_consolidator(client, model: str = "gpt-4o-mini"):
+    """
+    응고화 함수. 대화에서 '장기 기억할 압축된 사실'을 뽑고,
+    기존 기억과 충돌하는지 판단한다.
+    반환: {"fact": "찬기는 커피를 좋아한다", "conflicts_with": "기존사실"|None}
+          또는 {"fact": "NONE"} (기억할 것 없음)
+    """
+    import json
+    def consolidate_fn(question, answer, existing_facts):
+        try:
+            known = "\n".join(f"- {t[:50]}" for t in existing_facts[-15:]) or "(없음)"
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": (
+                    "대화에서 상대방(사용자)에 대해 오래 기억할 사실을 뽑아줘.\n"
+                    "규칙:\n"
+                    "1. 취향·직업·습관·관계·계획 같은 지속적 사실만.\n"
+                    "2. 짧고 명확한 한 문장으로 압축. 예: '찬기는 커피를 좋아한다'\n"
+                    "   (수다체 말고 사실만. 인사·잡담이면 fact를 'NONE')\n"
+                    "3. 이 사실이 기존 기억 중 하나와 '모순'되면 conflicts_with에 그 기존 사실을 적어.\n"
+                    "   (예: 기존 '축구를 좋아한다' vs 새 '축구를 이제 안 본다')\n"
+                    "   모순 없으면 conflicts_with는 null.\n\n"
+                    f"[기존 기억]\n{known}\n\n"
+                    f"[이번 대화]\n사용자: {question}\n몰랑이: {answer}\n\n"
+                    'JSON만 출력: {"fact": "...", "conflicts_with": null 또는 "기존사실"}')}],
+                temperature=0, max_tokens=100)
+            txt = resp.choices[0].message.content.strip()
+            txt = txt.replace("```json", "").replace("```", "").strip()
+            return json.loads(txt)
+        except Exception:
+            return None
+    return consolidate_fn
