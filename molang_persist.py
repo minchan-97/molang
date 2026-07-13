@@ -27,6 +27,7 @@ def save_molang_bytes(unified) -> bytes:
         "molang_faces": getattr(unified, "molang_faces", {}),
         "molang_appearance": getattr(unified, "molang_appearance", None),
         "last_talk_ts": getattr(unified, "last_talk_ts", None),
+        "self_model": getattr(unified, "self_model", None),
     }
     return pickle.dumps(bundle)
 
@@ -55,4 +56,7 @@ def load_molang_bytes(raw: bytes) -> UnifiedIdentity:
     u.molang_faces = bundle.get("molang_faces", {})
     u.molang_appearance = bundle.get("molang_appearance", None)
     u.last_talk_ts = bundle.get("last_talk_ts", None)
+    u.self_model = bundle.get("self_model", None)
+    import molang_self as _ms
+    _ms.ensure_self_model(u)   # 없으면 기존 데이터로 자동생성 (하위호환)
     return u
