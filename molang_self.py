@@ -66,31 +66,18 @@ def ensure_self_model(unified):
 
 def to_self_prompt(unified):
     """
-    자기 모델을 LLM에 주입할 프롬프트로 변환.
-    LLM이 뭐든(GPT/Claude) 같은 self_model을 읽으므로 정체성이 LLM에 독립적.
+    자기 모델을 짧은 배경 정보로 변환. 대화를 방해하지 않도록 최소화.
+    LLM이 뭐든 같은 self_model을 읽으므로 정체성이 LLM에 독립적.
     """
     sm = getattr(unified, "self_model", None)
     if sm is None:
         sm = ensure_self_model(unified)
 
-    lines = ["[너의 자기 인식 — 너는 지금 이런 상태야]"]
-    lines.append(f"너는 '{sm['정체성']}'.")
-
-    if sm["확신하는_것"]:
-        top = ", ".join(sm["확신하는_것"][:5])
-        lines.append(f"네가 확실히 아는 것: {top}")
-    if sm["아직_확신못하는_것"]:
-        top = ", ".join(sm["아직_확신못하는_것"][:5])
-        lines.append(f"아직 확실치 않은 것(아마도): {top}")
-    if sm["나의_사고방식"]:
-        lines.append(f"네가 주로 하는 사고: {', '.join(sm['나의_사고방식'])}")
-    lines.append(
-        f"너는 지금까지 {sm['겪어온_대화수']}번의 대화를 겪었고, "
-        f"{sm['아는_사실_총수']}가지를 알며, 정체성이 {sm['정체성_수정횟수']}번 다듬어졌어.")
-    lines.append(
-        "이 자기 인식을 바탕으로, 네가 뭘 알고 뭘 모르는지 스스로 알고 대답해. "
-        "모르는 걸 아는 척하지 말고, 확실한 건 자신 있게.")
-    return "\n".join(lines)
+    # 확신하는 것 위주로 아주 짧게 (배경 정보)
+    known = sm["확신하는_것"][:4]
+    if known:
+        return "(네가 아는 것: " + ", ".join(known) + ")"
+    return ""
 
 
 def self_reflection(unified):
