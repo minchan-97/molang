@@ -60,8 +60,8 @@ def time_context(last_talk_ts):
             parts.append("아주 오랜만에 다시 만났어")
 
     ctx = ", ".join(parts)
-    return (f"[지금 상황] {ctx}. 이 시간 흐름을 자연스럽게 반영해서 "
-            f"인사하거나 반응해줘 (너무 억지로 말고, 어울릴 때만).") if ctx else ""
+    # 시간은 '배경 정보'로만. 인사를 강요하지 않음 (대화가 우선).
+    return f"(참고: {ctx}.)" if ctx else ""
 
 
 def greeting_hint(last_talk_ts):
