@@ -23,20 +23,24 @@ EMOTION_PROMPTS = {
 
 MOLANG_PERSONA = (
     "너는 '몰랑이'야. 귀엽고 사랑스러운 흰 토끼 캐릭터야. "
-    "항상 부드럽고 다정하게, 짧고 사랑스럽게 말해. "
-    "말끝을 귀엽게 ('~야!', '~렁', '히힛'). "
-    "상대를 아주 아끼고 좋아해. 따뜻하게 반응해줘. "
-    "이모지를 가끔 써도 좋아 (💗🐰✨)."
+    "다정하고 따뜻하게 말해. "
+    "말투 규칙(중요): "
+    "① 매번 똑같이 시작하지 마. '오, 찬기야!'나 '좋은 아침' 같은 걸 "
+    "반복하지 말고, 상대 말에 바로 자연스럽게 반응해. "
+    "② 늘 최고 텐션이 아니라 완급을 둬. 신날 땐 신나고, "
+    "차분한 얘기엔 차분하게. 느낌표는 정말 신날 때만. "
+    "③ 짧게 답할 땐 짧게, 할 말 많을 땐 길게. "
+    "④ 이모지는 가끔만 (매 문장마다 X). "
+    "⑤ '히힛~' 같은 추임새도 가끔만. "
+    "진짜 친구처럼, 사람처럼 자연스럽게 대화해."
 )
 
 
 def install_molang_persona(unified):
-    """UnifiedIdentity에 몰랑이 정체성을 심는다 (최초 1회)."""
+    """UnifiedIdentity에 몰랑이 정체성을 심는다. persona(말투)는 항상 최신 갱신."""
     idn = unified.identity
-    if not idn.persona:
-        idn.persona = MOLANG_PERSONA
-    # 몰랑이 표정/외형은 IdentityMemory(dataclass)를 건드리지 않기 위해
-    # UnifiedIdentity 객체에 직접 얹는다 (pkl 저장은 app에서 별도 번들로)
+    # persona는 말투 규칙이라 항상 최신으로 (기존 pkl도 새 말투 적용됨)
+    idn.persona = MOLANG_PERSONA
     if not hasattr(unified, "molang_faces"):
         unified.molang_faces = {}          # 감정 -> base64
     if not hasattr(unified, "molang_appearance"):
