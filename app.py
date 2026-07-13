@@ -145,7 +145,7 @@ last_emo = st.session_state.chat[-1][2] if st.session_state.chat else "기쁨"
 hp = profile_for(last_emo)
 head = f'<img src="{dataurl(hp)}" class="head-pic">' if hp else '🐰'
 st.markdown(f'<div class="chat-head">{head}몰랑이 💗</div>', unsafe_allow_html=True)
-st.caption("🔧 버전 v12 (대화 자연스럽게)")  # 이게 보이면 새 코드가 도는 것
+st.caption("🔧 버전 v13 (말투 완급)")  # 이게 보이면 새 코드가 도는 것
 
 # ── 대화 표시 ──
 for role,text,emo in st.session_state.chat:
