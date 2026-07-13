@@ -145,7 +145,7 @@ last_emo = st.session_state.chat[-1][2] if st.session_state.chat else "기쁨"
 hp = profile_for(last_emo)
 head = f'<img src="{dataurl(hp)}" class="head-pic">' if hp else '🐰'
 st.markdown(f'<div class="chat-head">{head}몰랑이 💗</div>', unsafe_allow_html=True)
-st.caption("🔧 버전 v11 (자기인식)")  # 이게 보이면 새 코드가 도는 것
+st.caption("🔧 버전 v12 (대화 자연스럽게)")  # 이게 보이면 새 코드가 도는 것
 
 # ── 대화 표시 ──
 for role,text,emo in st.session_state.chat:
@@ -192,7 +192,8 @@ if msg or photo:
             except Exception: answer = "우와 사진이다! 🐰💗"
             result = None
         else:
-            q_with_time = q + "\n" + self_ctx + (("\n" + time_ctx) if time_ctx else "")
+            bg = self_ctx + ((" " + time_ctx) if time_ctx else "")
+            q_with_time = f"사용자가 방금 한 말: \"{q}\"\n{bg}"
             result = u.think(q_with_time, choose_fn=choose_fn, answer_fn=answer_fn,
                              classify_fn=classify_fn, tree_factory=designer)
             answer = result["answer"] or "히힛 🐰"
