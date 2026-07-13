@@ -70,30 +70,32 @@ def make_answer_fn(client, node_map, model: str = "gpt-4o-mini"):
             if node and node.directive:
                 directives.append(node.directive)
 
-        if not directives:
-            proc = ""
-        else:
-            proc = "다음 판단 절차를 '내부적으로' 따르세요:\n" + \
-                   "\n".join(f"  - {d}" for d in directives)
+        proc = ""
+        if directives:
+            proc = "(참고할 사고 흐름: " + " / ".join(directives) + ")"
 
         prompt = (
+            f"너는 몰랑이야. 아래는 지금까지의 배경 정보야:\n"
             f"{context}\n\n"
             f"{proc}\n\n"
-            f"위 절차는 당신의 사고 과정입니다. 절차대로 판단하되, "
-            f"답변은 '1. 2. 3.' 같은 번호 나열이 아니라 자연스럽고 따뜻한 "
-            f"대화체로 쓰세요. 사람에게 말하듯 편하게.\n"
-            f"중요: 위에 '이전에 확인된 것'이나 '최근 대화 흐름'이 있으면, "
-            f"그 정보를 반드시 활용해 답하세요. 예를 들어 사용자 이름·취미 등이 "
-            f"기억에 있으면 그것을 근거로 답하세요. '모른다'고 하지 마세요.\n"
-            f"만약 특정 자료·근거를 참고했다면, 답변 맨 끝에 별도 줄로 "
-            f"'[근거: ...]' 형식으로 간단히 적으세요. 없으면 생략하세요.")
+            f"가장 중요한 규칙:\n"
+            f"1. 사용자의 '가장 최근 말'에 직접 답하는 게 최우선이야. "
+            f"질문하면 그 질문에 답하고, 새 얘기를 하면 거기에 반응해.\n"
+            f"2. 매번 똑같은 인사('좋은 아침' 등)를 반복하지 마. "
+            f"이미 인사했으면 또 하지 말고, 대화를 이어가.\n"
+            f"3. 배경 정보(시간·기억)는 필요할 때만 자연스럽게 쓰고, "
+            f"억지로 끼워넣지 마.\n"
+            f"4. 짧고 따뜻한 대화체로. 몰랑이답게 귀엽게.\n"
+            f"5. 사용자가 뭘 물으면 아는 만큼 답하고, 모르면 솔직히 "
+            f"'잘 모르겠어'라고 해도 돼.\n"
+            f"만약 특정 자료를 참고했다면 맨 끝에 '[근거: ...]'로 적어. 없으면 생략."
+        )
         try:
             resp = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.6, max_tokens=500)
+                temperature=0.7, max_tokens=400)
             text = resp.choices[0].message.content.strip()
-            # 근거 추출 (감사 기록용)
             sources = []
             import re
             for m in re.finditer(r'\[근거:\s*([^\]]+)\]', text):
@@ -319,4 +321,3 @@ def make_consolidator(client, model: str = "gpt-4o-mini"):
         except Exception:
             return None
     return consolidate_fn
-
